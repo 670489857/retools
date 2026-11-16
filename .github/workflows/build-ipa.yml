@@ -15,7 +15,6 @@ jobs:
           echo "using $latest"
           sudo xcode-select -s "$latest/Contents/Developer"
           xcodebuild -version
-          xcodebuild -showsdks | grep -i iphoneos || true
       - name: Install XcodeGen
         run: |
           brew install xcodegen || true
@@ -23,13 +22,20 @@ jobs:
       - name: Generate project
         run: xcodegen generate
       - name: Build (no signing)
+        id: build
         run: |
-          set -o pipefail
+          set +e
           xcodebuild -project Retools.xcodeproj -scheme Retools -configuration Release \
             -destination 'generic/platform=iOS' -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tail -120
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > xcodebuild.log 2>&1
+          rc=$?
+          echo "xcodebuild rc=$rc"
+          grep -nE ": error:" xcodebuild.log | head -40 || true
+          tail -40 xcodebuild.log
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
       - name: Package unsigned IPA
-        if: success()
+        if: steps.build.outputs.rc == '0'
         run: |
           set -e
           APP=$(find build -type d -name 'Retools.app' | head -1)
@@ -39,8 +45,10 @@ jobs:
           cd out && zip -qry Retools-unsigned.ipa Payload
           ls -lh Retools-unsigned.ipa
       - uses: actions/upload-artifact@v4
-        if: success()
+        if: always()
         with:
-          name: Retools-unsigned-ipa
-          path: out/Retools-unsigned.ipa
-          if-no-files-found: error
+          name: build-output
+          path: |
+            xcodebuild.log
+            out/Retools-unsigned.ipa
+          if-no-files-found: warn
