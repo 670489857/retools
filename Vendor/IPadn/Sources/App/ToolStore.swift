@@ -1022,21 +1022,38 @@ final class ToolStore: ObservableObject {
     }
 
     func exportDiagnostics() throws -> URL {
-        let details = [
-            "iPadn " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""), "Platform: \(settings.store.platform.title)", "Region: \(settings.store.country)",
-            "Jobs: \(downloads.jobs.count)", "Concurrent limit: \(settings.maxConcurrentDownloads)",
-            "Version sources: \(settings.versionSources.filter(\.enabled).count)",
-            "Task states: " + downloads.jobs.map { "\($0.id.uuidString.prefix(8)): \($0.status.rawValue)" }.joined(separator: ", "),
-            "Installation: " + (settings.nativeInstallation ? "native" : settings.automaticInstallation ? "one-tap" : settings.localInstallation ? "local certificate" : "proxy"),
-            "Native installer: " + (NativeInstaller.isAvailable ? "linked" : "not linked") + ", pairing file: " + (NativeInstaller.hasPairingFile ? "yes" : "no"),
-            "Runs inside LiveContainer: " + (InstallLog.insideLiveContainer ? "yes" : "no"),
-            "Proxy or VPN on: " + (LocalHostRecord.proxyOrVPNActive ? "yes" : "no"),
-            "iOS " + UIDevice.current.systemVersion,
-            "Last login (metadata only):", apple.loginDiagnostic,
-            "Last update check (metadata only):", appUpdateDiagnostic,
-            "Installation server log:", InstallLog.shared.text.isEmpty ? "(empty)" : InstallLog.shared.text,
-            "Contains no credentials, cookies, Apple account names or download URLs."
-        ].joined(separator: "\n")
+        var parts: [String] = []
+        let bundleVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        parts.append("iPadn " + bundleVersion)
+        parts.append("Platform: " + settings.store.platform.title)
+        parts.append("Region: " + settings.store.country)
+        parts.append("Jobs: " + String(downloads.jobs.count))
+        parts.append("Concurrent limit: " + String(settings.maxConcurrentDownloads))
+        parts.append("Version sources: " + String(settings.versionSources.filter(\.enabled).count))
+        parts.append("Task states: " + downloads.jobs.map { job -> String in "\(job.id.uuidString.prefix(8)): \(job.status.rawValue)" }.joined(separator: ", "))
+        var installationMode: String = "proxy"
+        if settings.nativeInstallation {
+            installationMode = "native"
+        } else if settings.automaticInstallation {
+            installationMode = "one-tap"
+        } else if settings.localInstallation {
+            installationMode = "local certificate"
+        }
+        parts.append("Installation: " + installationMode)
+        let linkedState: String = NativeInstaller.isAvailable ? "linked" : "not linked"
+        let pairingState: String = NativeInstaller.hasPairingFile ? "yes" : "no"
+        parts.append("Native installer: " + linkedState + ", pairing file: " + pairingState)
+        parts.append("Runs inside LiveContainer: " + (InstallLog.insideLiveContainer ? "yes" : "no"))
+        parts.append("Proxy or VPN on: " + (LocalHostRecord.proxyOrVPNActive ? "yes" : "no"))
+        parts.append("iOS " + UIDevice.current.systemVersion)
+        parts.append("Last login (metadata only):")
+        parts.append(apple.loginDiagnostic)
+        parts.append("Last update check (metadata only):")
+        parts.append(appUpdateDiagnostic)
+        parts.append("Installation server log:")
+        parts.append(InstallLog.shared.text.isEmpty ? "(empty)" : InstallLog.shared.text)
+        parts.append("Contains no credentials, cookies, Apple account names or download URLs.")
+        let details: String = parts.joined(separator: "\n")
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("iPadn-Diagnostics.txt")
         try details.write(to: url, atomically: true, encoding: .utf8)
         return url
