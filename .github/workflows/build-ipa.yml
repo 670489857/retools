@@ -1,0 +1,49 @@
+name: build-ipa
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory Xcode
+        run: |
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+          xcodebuild -version || true
+          xcode-select -p || true
+      - name: Select newest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest/Contents/Developer"; fi
+          xcodebuild -version
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen || true
+          xcodegen --version
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build (no signing)
+        run: |
+          set -o pipefail
+          xcodebuild -project Retools.xcodeproj -scheme Retools -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tail -80
+      - name: Package unsigned IPA
+        run: |
+          set -e
+          APP=$(find build -type d -name 'Retools.app' | head -1)
+          echo "app=$APP"
+          test -d "$APP"
+          rm -rf out && mkdir -p out/Payload
+          cp -R "$APP" out/Payload/
+          cd out && zip -qry Retools-unsigned.ipa Payload
+          ls -lh Retools-unsigned.ipa
+          unzip -l Retools-unsigned.ipa | head -6
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Retools-unsigned-ipa
+          path: out/Retools-unsigned.ipa
+          if-no-files-found: error
