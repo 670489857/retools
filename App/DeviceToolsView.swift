@@ -553,6 +553,20 @@ struct DeviceContainerBrowser: View {
     private var mutationsReady: Bool { !loading && working == nil && (localFileAccess ? failure == nil : access != nil) }
     /// 只能访问文稿时，根目录实际列出的是 /Documents。
     private var directory: String { access == .documents && path == "/" ? "/Documents" : path }
+    private var deleteTitle: String { pendingDelete.map { "删除「\($0.name)」？" } ?? "" }
+    private var deleteBinding: Binding<Bool> { Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }) }
+    private var promptTitle: String { filePrompt?.title ?? "文件操作" }
+    private var promptBinding: Binding<Bool> { Binding(get: { filePrompt != nil }, set: { if !$0 { filePrompt = nil } }) }
+
+    private func deleteMessage(_ item: DeviceFileItem) -> String {
+        if localFileAccess {
+            if item.isDirectory { return "仅删除空文件夹；有内容的文件夹会保留。" }
+            return "删除前会在 Retools 中备份原文件，可从「文件备份」导出恢复。"
+        }
+        if item.isDirectory { return "文件夹及其中所有内容都会从「\(app.name)」里删除，无法恢复。" }
+        return "文件会从「\(app.name)」里删除，无法恢复。"
+    }
+
     private var itemsHeader: String { "目录内容 · \(visibleItems.count)" }
 
     @ViewBuilder
@@ -661,14 +675,13 @@ struct DeviceContainerBrowser: View {
                 workspace.toast = "已保存，原文件已备份"
             }
         }
-        .confirmationDialog(pendingDelete.map { "删除「\($0.name)」？" } ?? "", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
+        .confirmationDialog(deleteTitle, isPresented: deleteBinding,
                             titleVisibility: .visible, presenting: pendingDelete) { item in
             Button("删除", role: .destructive) { remove(item) }
         } message: { item in
-            Text(localFileAccess ? (item.isDirectory ? "仅删除空文件夹；有内容的文件夹会保留。" : "删除前会在 Retools 中备份原文件，可从「文件备份」导出恢复。")
-                 : (item.isDirectory ? "文件夹及其中所有内容都会从「\(app.name)」里删除，无法恢复。" : "文件会从「\(app.name)」里删除，无法恢复。"))
+            Text(deleteMessage(item))
         }
-        .alert(filePrompt?.title ?? "文件操作", isPresented: Binding(get: { filePrompt != nil }, set: { if !$0 { filePrompt = nil } }), presenting: filePrompt) { prompt in
+        .alert(promptTitle, isPresented: promptBinding, presenting: filePrompt) { prompt in
             switch prompt {
             case .folder:
                 TextField("名称", text: $folderName)
