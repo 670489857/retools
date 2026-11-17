@@ -505,6 +505,36 @@ struct DeviceContainerBrowser: View {
     @State private var query = ""
     private var visibleItems: [DeviceFileItem] { items.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) } }
 
+    @ViewBuilder
+    private func containerRow(_ item: DeviceFileItem) -> some View {
+            Group {
+                if item.isDirectory {
+                    NavigationLink { DeviceContainerBrowser(app: app, path: item.path, root: root, mode: mode) } label: { DeviceFileRow(item: item) }
+                } else if !readable(item) {
+                    DeviceFileRow(item: item, note: localKinds[item.path] == .symbolicLink ? "符号链接" : "不可读取")
+                        .foregroundStyle(Color.secondary)
+                } else {
+                    Button { openFile(item) } label: { DeviceFileRow(item: item) }.tint(.primary)
+                }
+            }
+            .disabled(working != nil || loading)
+            .swipeActions { if canWrite, mutable(item) { Button("删除", role: .destructive) { pendingDelete = item } } }
+            .contextMenu {
+                if !item.isDirectory, readable(item) {
+                    Button { open(item, sharing: false) } label: { Label("预览", systemImage: "eye") }
+                    Button { open(item, sharing: true) } label: { Label("导出", systemImage: "square.and.arrow.up") }
+                    if localFileAccess {
+                        Button { edit(item) } label: { Label("编辑文本或属性列表", systemImage: "square.and.pencil") }
+                    }
+                }
+                if localFileAccess, mutable(item) {
+                    Button { renameName = item.name; filePrompt = .rename(item) } label: { Label("重命名", systemImage: "pencil") }
+                }
+                if canWrite, mutable(item) { Button(role: .destructive) { pendingDelete = item } label: { Label("删除", systemImage: "trash") } }
+            }
+    }
+
+
     private var title: String { path == "/" ? (root?.title ?? app.name) : (path as NSString).lastPathComponent }
     private var latestApp: DeviceInstalledApp { tools.apps.first { $0.bundleID == app.bundleID } ?? app }
     private var sharedRoots: [DeviceFileRoot] { localFileAccess && root == nil && path == "/" ? DeviceFileAccess.sharedRoots(for: latestApp) : [] }
@@ -541,31 +571,7 @@ struct DeviceContainerBrowser: View {
             }
             Section {
             ForEach(visibleItems) { item in
-                Group {
-                    if item.isDirectory {
-                        NavigationLink { DeviceContainerBrowser(app: app, path: item.path, root: root, mode: mode) } label: { DeviceFileRow(item: item) }
-                    } else if !readable(item) {
-                        DeviceFileRow(item: item, note: localKinds[item.path] == .symbolicLink ? "符号链接" : "不可读取")
-                            .foregroundStyle(Color.secondary)
-                    } else {
-                        Button { openFile(item) } label: { DeviceFileRow(item: item) }.tint(.primary)
-                    }
-                }
-                .disabled(working != nil || loading)
-                .swipeActions { if canWrite, mutable(item) { Button("删除", role: .destructive) { pendingDelete = item } } }
-                .contextMenu {
-                    if !item.isDirectory, readable(item) {
-                        Button { open(item, sharing: false) } label: { Label("预览", systemImage: "eye") }
-                        Button { open(item, sharing: true) } label: { Label("导出", systemImage: "square.and.arrow.up") }
-                        if localFileAccess {
-                            Button { edit(item) } label: { Label("编辑文本或属性列表", systemImage: "square.and.pencil") }
-                        }
-                    }
-                    if localFileAccess, mutable(item) {
-                        Button { renameName = item.name; filePrompt = .rename(item) } label: { Label("重命名", systemImage: "pencil") }
-                    }
-                    if canWrite, mutable(item) { Button(role: .destructive) { pendingDelete = item } label: { Label("删除", systemImage: "trash") } }
-                }
+                    containerRow(item)
             }
             } header: { Text("目录内容 · \(visibleItems.count)") }
             if !items.isEmpty, visibleItems.isEmpty { ContentUnavailableView.search(text: query) }
