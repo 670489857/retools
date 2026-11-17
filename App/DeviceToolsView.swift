@@ -553,6 +553,11 @@ struct DeviceContainerBrowser: View {
     private var mutationsReady: Bool { !loading && working == nil && (localFileAccess ? failure == nil : access != nil) }
     /// 只能访问文稿时，根目录实际列出的是 /Documents。
     private var directory: String { access == .documents && path == "/" ? "/Documents" : path }
+    @ViewBuilder
+    private func sharedRootRow(_ shared: DeviceFileRoot) -> some View {
+        NavigationLink { DeviceContainerBrowser(app: app, path: "/", root: shared, mode: .local) } label: { Label(shared.title, systemImage: "folder.fill") }
+    }
+
     private var showsDocumentsOnlyNote: Bool { path == "/" && access == .documents }
     private var showsNoSearchResults: Bool { !items.isEmpty && visibleItems.isEmpty }
     private var showsEmptyFolder: Bool { !loading && failure == nil && items.isEmpty && sharedRoots.isEmpty }
@@ -591,7 +596,7 @@ struct DeviceContainerBrowser: View {
             if !sharedRoots.isEmpty {
                 Section("共享数据") {
                     ForEach(sharedRoots) { shared in
-                        NavigationLink { DeviceContainerBrowser(app: app, path: "/", root: shared, mode: .local) } label: { Label(shared.title, systemImage: "folder.fill") }
+                        sharedRootRow(shared)
                     }
                 }
             }
