@@ -532,8 +532,10 @@ struct DeviceContainerBrowser: View {
                 Section {
                     Label(failure, systemImage: "exclamationmark.triangle").foregroundStyle(.orange).textSelection(.enabled)
                         .accessibilityIdentifier("deviceTools.files.failure")
-                    if localFileAccess, HostAppGroup.signedIdentifier() == nil {
-                        NavigationLink("配置 App Group 开发签名") { DevelopmentSigningView() }
+                    if localFileAccess {
+                        if HostAppGroup.signedIdentifier() == nil {
+                            NavigationLink("配置 App Group 开发签名") { DevelopmentSigningView() }
+                        }
                     }
                 }
             }
