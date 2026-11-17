@@ -507,31 +507,41 @@ struct DeviceContainerBrowser: View {
 
     @ViewBuilder
     private func containerRow(_ item: DeviceFileItem) -> some View {
-            Group {
-                if item.isDirectory {
-                    NavigationLink { DeviceContainerBrowser(app: app, path: item.path, root: root, mode: mode) } label: { DeviceFileRow(item: item) }
-                } else if !readable(item) {
-                    DeviceFileRow(item: item, note: localKinds[item.path] == .symbolicLink ? "符号链接" : "不可读取")
-                        .foregroundStyle(Color.secondary)
-                } else {
-                    Button { openFile(item) } label: { DeviceFileRow(item: item) }.tint(.primary)
-                }
+        Group {
+            if item.isDirectory {
+                NavigationLink { DeviceContainerBrowser(app: app, path: item.path, root: root, mode: mode) } label: { DeviceFileRow(item: item) }
+            } else if !readable(item) {
+                DeviceFileRow(item: item, note: localKinds[item.path] == .symbolicLink ? "符号链接" : "不可读取")
+                    .foregroundStyle(Color.secondary)
+            } else {
+                Button { openFile(item) } label: { DeviceFileRow(item: item) }.tint(.primary)
             }
-            .disabled(working != nil || loading)
-            .swipeActions { if canWrite, mutable(item) { Button("删除", role: .destructive) { pendingDelete = item } } }
-            .contextMenu {
-                if !item.isDirectory, readable(item) {
+        }
+        .disabled(working != nil || loading)
+        .swipeActions {
+            if canWrite {
+                if mutable(item) { Button("删除", role: .destructive) { pendingDelete = item } }
+            }
+        }
+        .contextMenu {
+            if !item.isDirectory {
+                if readable(item) {
                     Button { open(item, sharing: false) } label: { Label("预览", systemImage: "eye") }
                     Button { open(item, sharing: true) } label: { Label("导出", systemImage: "square.and.arrow.up") }
                     if localFileAccess {
                         Button { edit(item) } label: { Label("编辑文本或属性列表", systemImage: "square.and.pencil") }
                     }
                 }
-                if localFileAccess, mutable(item) {
+            }
+            if localFileAccess {
+                if mutable(item) {
                     Button { renameName = item.name; filePrompt = .rename(item) } label: { Label("重命名", systemImage: "pencil") }
                 }
-                if canWrite, mutable(item) { Button(role: .destructive) { pendingDelete = item } label: { Label("删除", systemImage: "trash") } }
             }
+            if canWrite {
+                if mutable(item) { Button(role: .destructive) { pendingDelete = item } label: { Label("删除", systemImage: "trash") } }
+            }
+        }
     }
 
 
@@ -543,6 +553,8 @@ struct DeviceContainerBrowser: View {
     private var mutationsReady: Bool { !loading && working == nil && (localFileAccess ? failure == nil : access != nil) }
     /// 只能访问文稿时，根目录实际列出的是 /Documents。
     private var directory: String { access == .documents && path == "/" ? "/Documents" : path }
+    private var showsDocumentsOnlyNote: Bool { path == "/" && access == .documents }
+    private var showsNoSearchResults: Bool { !items.isEmpty && visibleItems.isEmpty }
     private var showsEmptyFolder: Bool { !loading && failure == nil && items.isEmpty && sharedRoots.isEmpty }
 
     var body: some View {
@@ -556,7 +568,7 @@ struct DeviceContainerBrowser: View {
                     }
                 }
                     .accessibilityIdentifier("deviceTools.files.localMode")
-            } else if path == "/", access == .documents {
+            } else if showsDocumentsOnlyNote {
                 Section { Label("只能访问「文稿」文件夹。", systemImage: "lock").font(.footnote).foregroundStyle(Color.secondary) }
             }
             if let failure {
@@ -575,7 +587,7 @@ struct DeviceContainerBrowser: View {
                     containerRow(item)
             }
             } header: { Text("目录内容 · \(visibleItems.count)") }
-            if !items.isEmpty, visibleItems.isEmpty { ContentUnavailableView.search(text: query) }
+            if showsNoSearchResults { ContentUnavailableView.search(text: query) }
             if !sharedRoots.isEmpty {
                 Section("共享数据") {
                     ForEach(sharedRoots) { shared in
