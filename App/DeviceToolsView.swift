@@ -543,6 +543,7 @@ struct DeviceContainerBrowser: View {
     private var mutationsReady: Bool { !loading && working == nil && (localFileAccess ? failure == nil : access != nil) }
     /// 只能访问文稿时，根目录实际列出的是 /Documents。
     private var directory: String { access == .documents && path == "/" ? "/Documents" : path }
+    private var showsEmptyFolder: Bool { !loading && failure == nil && items.isEmpty && sharedRoots.isEmpty }
 
     var body: some View {
         List {
@@ -582,7 +583,7 @@ struct DeviceContainerBrowser: View {
                     }
                 }
             }
-            if !loading, failure == nil, items.isEmpty, sharedRoots.isEmpty { ContentUnavailableView("空文件夹", systemImage: "folder") }
+            if showsEmptyFolder { ContentUnavailableView("空文件夹", systemImage: "folder") }
             if let working { Section { HStack { ProgressView(); Text(working) } } }
         }
         .overlay { if loading && items.isEmpty { ProgressView() } }
