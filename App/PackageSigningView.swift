@@ -96,7 +96,7 @@ struct PackageSigningView: View {
             }
         }
         .interactiveDismissDisabled(busy)
-        .task(id: (package?.fileName ?? "") + ":\(embeddedAttempt)") {
+        .task(id: "\(package?.fileName ?? ""):\(embeddedAttempt)") {
             inspectingEmbedded = true
             defer { inspectingEmbedded = false }
             do { embedded = try await store.service.embeddedLibraries(for: .package(packageID)); embeddedIssue = nil }
